@@ -8,7 +8,7 @@ SSH_USER="${SSH_USER:-root}"
 PROJECT_DIR="/opt/bitcoin-realtime-forecasting-platform"
 SERVICE_DIR="${PROJECT_DIR}/services/kafka"
 REMOTE_COMPOSE="${SERVICE_DIR}/docker-compose.yml"
-KAFKA_IMAGE="${KAFKA_IMAGE:-bitnami/kafka:3.7}"
+KAFKA_IMAGE="${KAFKA_IMAGE:-apache/kafka:3.7.0}"
 
 if [[ ! -d "${TF_DIR}" ]]; then
   echo "Terraform directory not found: ${TF_DIR}" >&2
@@ -43,7 +43,10 @@ kafka2_private="$(echo "${PRIVATE_IPS}" | jq -r '."kafka-2"')"
 kafka3_private="$(echo "${PRIVATE_IPS}" | jq -r '."kafka-3"')"
 
 controller_quorum="1@${kafka1_private}:9093,2@${kafka2_private}:9093,3@${kafka3_private}:9093"
-cluster_id="btc-realtime-kafka-cluster-0001"
+
+# Valid Kafka KRaft cluster id.
+# Keep this identical for all brokers in this educational cluster.
+cluster_id="5L6g3nShT-eMCtK--X86sw"
 
 deploy_node() {
   local node_name="$1"
@@ -63,32 +66,31 @@ services:
   kafka:
     image: ${KAFKA_IMAGE}
     container_name: kafka
+    hostname: ${node_name}
     restart: unless-stopped
     ports:
       - "9092:9092"
       - "9093:9093"
     environment:
-      - KAFKA_ENABLE_KRAFT=yes
-      - KAFKA_KRAFT_CLUSTER_ID=${cluster_id}
-      - KAFKA_CFG_NODE_ID=${node_id}
-      - KAFKA_BROKER_ID=${node_id}
-      - KAFKA_CFG_PROCESS_ROLES=broker,controller
-      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
-      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
-      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://${private_ip}:9092
-      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
-      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=${controller_quorum}
-      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
-      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=false
-      - KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR=3
-      - KAFKA_CFG_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=3
-      - KAFKA_CFG_TRANSACTION_STATE_LOG_MIN_ISR=2
-      - KAFKA_CFG_MIN_INSYNC_REPLICAS=2
-      - KAFKA_CFG_DEFAULT_REPLICATION_FACTOR=3
-      - KAFKA_CFG_NUM_PARTITIONS=6
-      - ALLOW_PLAINTEXT_LISTENER=yes
+      CLUSTER_ID: "${cluster_id}"
+      KAFKA_NODE_ID: "${node_id}"
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "${controller_quorum}"
+      KAFKA_LISTENERS: "PLAINTEXT://:9092,CONTROLLER://:9093"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://${private_ip}:9092"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "3"
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "3"
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "2"
+      KAFKA_MIN_INSYNC_REPLICAS: "2"
+      KAFKA_DEFAULT_REPLICATION_FACTOR: "3"
+      KAFKA_NUM_PARTITIONS: "6"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_LOG_DIRS: "/tmp/kraft-combined-logs"
     volumes:
-      - kafka_data:/bitnami/kafka
+      - kafka_data:/tmp/kraft-combined-logs
     networks:
       - kafka_net
 
@@ -109,7 +111,7 @@ EOF
   rm -f "${tmp_compose}"
 
   ssh -i "${SSH_KEY}" -o StrictHostKeyChecking=accept-new "${SSH_USER}@${public_ip}" \
-    "cd ${SERVICE_DIR} && docker compose pull && docker compose up -d"
+    "cd ${SERVICE_DIR} && docker compose down --remove-orphans || true && docker compose pull && docker compose up -d"
 
   echo "[kafka-deploy] ${node_name} deployed"
 }
@@ -120,7 +122,7 @@ deploy_node "kafka-3" "3" "${kafka3_public}" "${kafka3_private}"
 
 echo
 echo "[kafka-deploy] Waiting for Kafka containers to initialize..."
-sleep 25
+sleep 35
 
 echo
 echo "[kafka-deploy] Deployment complete"
