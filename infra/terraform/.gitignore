@@ -4,3 +4,6 @@
 terraform.tfvars
 crash.log
 crash.*.log
+
+tfplan
+*.tfplan
