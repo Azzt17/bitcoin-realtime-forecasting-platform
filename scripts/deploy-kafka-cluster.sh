@@ -7,6 +7,7 @@ SSH_USER="${SSH_USER:-root}"
 
 PROJECT_DIR="/opt/bitcoin-realtime-forecasting-platform"
 SERVICE_DIR="${PROJECT_DIR}/services/kafka"
+KAFKA_DATA_BASE="${PROJECT_DIR}/data/kafka"
 REMOTE_COMPOSE="${SERVICE_DIR}/docker-compose.yml"
 KAFKA_IMAGE="${KAFKA_IMAGE:-apache/kafka:3.7.0}"
 
@@ -45,6 +46,7 @@ kafka3_private="$(echo "${PRIVATE_IPS}" | jq -r '."kafka-3"')"
 controller_quorum="1@${kafka1_private}:9093,2@${kafka2_private}:9093,3@${kafka3_private}:9093"
 
 # Kafka KRaft cluster id must be identical across all brokers.
+# Apache Kafka Docker image uses CLUSTER_ID during storage formatting.
 cluster_id="5L6g3nShT-eMCtK--X86sw"
 
 deploy_node() {
@@ -52,6 +54,7 @@ deploy_node() {
   local node_id="$2"
   local public_ip="$3"
   local private_ip="$4"
+  local node_data_dir="${KAFKA_DATA_BASE}/${node_name}"
 
   echo
   echo "[kafka-deploy] Deploying ${node_name}"
@@ -71,7 +74,7 @@ services:
       - "9092:9092"
       - "9093:9093"
     environment:
-      KAFKA_CLUSTER_ID: "${cluster_id}"
+      CLUSTER_ID: "${cluster_id}"
       KAFKA_NODE_ID: "${node_id}"
       KAFKA_PROCESS_ROLES: "broker,controller"
       KAFKA_CONTROLLER_QUORUM_VOTERS: "${controller_quorum}"
@@ -90,12 +93,9 @@ services:
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: "0"
       KAFKA_LOG_DIRS: "/tmp/kraft-combined-logs"
     volumes:
-      - kafka_data:/tmp/kraft-combined-logs
+      - ${node_data_dir}:/tmp/kraft-combined-logs
     networks:
       - kafka_net
-
-volumes:
-  kafka_data:
 
 networks:
   kafka_net:
@@ -110,10 +110,18 @@ EOF
 
   rm -f "${tmp_compose}"
 
-  # This is safe for the first deployment phase because no production data exists yet.
-  # It clears stale KRaft metadata from previous failed/restarting attempts.
+  # First deployment environment has no production Kafka data yet.
+  # Clean failed KRaft attempts and prepare a host bind mount writable by appuser UID 1000.
   ssh -i "${SSH_KEY}" -o StrictHostKeyChecking=accept-new "${SSH_USER}@${public_ip}" \
-    "cd ${SERVICE_DIR} && docker compose down -v --remove-orphans || true && docker compose pull && docker compose up -d"
+    "cd ${SERVICE_DIR} && \
+     docker compose down -v --remove-orphans || true && \
+     docker rm -f kafka 2>/dev/null || true && \
+     rm -rf ${node_data_dir} && \
+     mkdir -p ${node_data_dir} && \
+     chown -R 1000:1000 ${node_data_dir} && \
+     chmod -R 775 ${node_data_dir} && \
+     docker compose pull && \
+     docker compose up -d"
 
   echo "[kafka-deploy] ${node_name} deployed"
 }
