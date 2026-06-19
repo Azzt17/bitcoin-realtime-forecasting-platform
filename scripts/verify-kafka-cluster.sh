@@ -4,6 +4,7 @@ set -euo pipefail
 TF_DIR="${1:-infra/terraform}"
 SSH_KEY="${SSH_KEY:-$HOME/.ssh/bitcoin_realtime_platform}"
 SSH_USER="${SSH_USER:-root}"
+KAFKA_BIN="${KAFKA_BIN:-/opt/kafka/bin}"
 
 if [[ ! -d "${TF_DIR}" ]]; then
   echo "Terraform directory not found: ${TF_DIR}" >&2
@@ -49,14 +50,19 @@ verify_node "kafka-2" "${kafka2_public}"
 verify_node "kafka-3" "${kafka3_public}"
 
 echo
+echo "===== Kafka CLI path check ====="
+ssh -i "${SSH_KEY}" -o StrictHostKeyChecking=accept-new "${SSH_USER}@${kafka1_public}" \
+  "docker exec kafka test -x ${KAFKA_BIN}/kafka-topics.sh && echo '${KAFKA_BIN}/kafka-topics.sh OK'"
+
+echo
 echo "===== Kafka broker API versions ====="
 ssh -i "${SSH_KEY}" -o StrictHostKeyChecking=accept-new "${SSH_USER}@${kafka1_public}" \
-  "docker exec kafka kafka-broker-api-versions.sh --bootstrap-server ${bootstrap} | head -n 30"
+  "docker exec kafka ${KAFKA_BIN}/kafka-broker-api-versions.sh --bootstrap-server ${bootstrap} | head -n 30"
 
 echo
 echo "===== Kafka topics ====="
 ssh -i "${SSH_KEY}" -o StrictHostKeyChecking=accept-new "${SSH_USER}@${kafka1_public}" \
-  "docker exec kafka kafka-topics.sh --bootstrap-server ${bootstrap} --list"
+  "docker exec kafka ${KAFKA_BIN}/kafka-topics.sh --bootstrap-server ${bootstrap} --list"
 
 echo
 echo "===== Produce/consume smoke test ====="
@@ -64,10 +70,10 @@ test_topic="btc.deadletter"
 test_message="{\"test\":\"kafka-smoke\",\"created_at\":\"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\"}"
 
 ssh -i "${SSH_KEY}" -o StrictHostKeyChecking=accept-new "${SSH_USER}@${kafka1_public}" \
-  "printf '%s\n' '${test_message}' | docker exec -i kafka kafka-console-producer.sh --bootstrap-server ${bootstrap} --topic ${test_topic}"
+  "printf '%s\n' '${test_message}' | docker exec -i kafka ${KAFKA_BIN}/kafka-console-producer.sh --bootstrap-server ${bootstrap} --topic ${test_topic}"
 
 ssh -i "${SSH_KEY}" -o StrictHostKeyChecking=accept-new "${SSH_USER}@${kafka1_public}" \
-  "timeout 10 docker exec kafka kafka-console-consumer.sh --bootstrap-server ${bootstrap} --topic ${test_topic} --from-beginning --max-messages 1"
+  "timeout 10 docker exec kafka ${KAFKA_BIN}/kafka-console-consumer.sh --bootstrap-server ${bootstrap} --topic ${test_topic} --from-beginning --max-messages 1"
 
 echo
 echo "[kafka-verify] Kafka smoke test completed"

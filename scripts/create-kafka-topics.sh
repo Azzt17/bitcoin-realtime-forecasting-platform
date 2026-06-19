@@ -4,6 +4,7 @@ set -euo pipefail
 TF_DIR="${1:-infra/terraform}"
 SSH_KEY="${SSH_KEY:-$HOME/.ssh/bitcoin_realtime_platform}"
 SSH_USER="${SSH_USER:-root}"
+KAFKA_BIN="${KAFKA_BIN:-/opt/kafka/bin}"
 
 if [[ ! -d "${TF_DIR}" ]]; then
   echo "Terraform directory not found: ${TF_DIR}" >&2
@@ -38,7 +39,7 @@ create_topic() {
   echo "[kafka-topics] Creating ${topic}"
 
   ssh -i "${SSH_KEY}" -o StrictHostKeyChecking=accept-new "${SSH_USER}@${kafka1_public}" \
-    "docker exec kafka kafka-topics.sh \
+    "docker exec kafka ${KAFKA_BIN}/kafka-topics.sh \
       --bootstrap-server ${bootstrap} \
       --create \
       --if-not-exists \
@@ -57,9 +58,9 @@ create_topic "btc.pipeline.metrics" "3" "3"
 echo
 echo "[kafka-topics] Topic list:"
 ssh -i "${SSH_KEY}" -o StrictHostKeyChecking=accept-new "${SSH_USER}@${kafka1_public}" \
-  "docker exec kafka kafka-topics.sh --bootstrap-server ${bootstrap} --list"
+  "docker exec kafka ${KAFKA_BIN}/kafka-topics.sh --bootstrap-server ${bootstrap} --list"
 
 echo
 echo "[kafka-topics] Topic descriptions:"
 ssh -i "${SSH_KEY}" -o StrictHostKeyChecking=accept-new "${SSH_USER}@${kafka1_public}" \
-  "docker exec kafka kafka-topics.sh --bootstrap-server ${bootstrap} --describe"
+  "docker exec kafka ${KAFKA_BIN}/kafka-topics.sh --bootstrap-server ${bootstrap} --describe"
