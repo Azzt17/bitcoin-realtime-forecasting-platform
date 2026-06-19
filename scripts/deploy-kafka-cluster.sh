@@ -44,8 +44,7 @@ kafka3_private="$(echo "${PRIVATE_IPS}" | jq -r '."kafka-3"')"
 
 controller_quorum="1@${kafka1_private}:9093,2@${kafka2_private}:9093,3@${kafka3_private}:9093"
 
-# Valid Kafka KRaft cluster id.
-# Keep this identical for all brokers in this educational cluster.
+# Kafka KRaft cluster id must be identical across all brokers.
 cluster_id="5L6g3nShT-eMCtK--X86sw"
 
 deploy_node() {
@@ -72,7 +71,7 @@ services:
       - "9092:9092"
       - "9093:9093"
     environment:
-      CLUSTER_ID: "${cluster_id}"
+      KAFKA_CLUSTER_ID: "${cluster_id}"
       KAFKA_NODE_ID: "${node_id}"
       KAFKA_PROCESS_ROLES: "broker,controller"
       KAFKA_CONTROLLER_QUORUM_VOTERS: "${controller_quorum}"
@@ -88,6 +87,7 @@ services:
       KAFKA_DEFAULT_REPLICATION_FACTOR: "3"
       KAFKA_NUM_PARTITIONS: "6"
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: "0"
       KAFKA_LOG_DIRS: "/tmp/kraft-combined-logs"
     volumes:
       - kafka_data:/tmp/kraft-combined-logs
@@ -110,8 +110,10 @@ EOF
 
   rm -f "${tmp_compose}"
 
+  # This is safe for the first deployment phase because no production data exists yet.
+  # It clears stale KRaft metadata from previous failed/restarting attempts.
   ssh -i "${SSH_KEY}" -o StrictHostKeyChecking=accept-new "${SSH_USER}@${public_ip}" \
-    "cd ${SERVICE_DIR} && docker compose down --remove-orphans || true && docker compose pull && docker compose up -d"
+    "cd ${SERVICE_DIR} && docker compose down -v --remove-orphans || true && docker compose pull && docker compose up -d"
 
   echo "[kafka-deploy] ${node_name} deployed"
 }
@@ -122,7 +124,7 @@ deploy_node "kafka-3" "3" "${kafka3_public}" "${kafka3_private}"
 
 echo
 echo "[kafka-deploy] Waiting for Kafka containers to initialize..."
-sleep 35
+sleep 45
 
 echo
 echo "[kafka-deploy] Deployment complete"
