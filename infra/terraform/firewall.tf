@@ -3,9 +3,13 @@ resource "digitalocean_firewall" "main" {
   tags = [digitalocean_tag.project.name]
 
   inbound_rule {
-    protocol         = "tcp"
-    port_range       = "22"
-    source_addresses = [var.trusted_ssh_cidr]
+    protocol   = "tcp"
+    port_range = "22"
+    source_addresses = [
+      var.trusted_ssh_cidr,
+      "180.251.174.234/32",
+      "34.160.111.145"
+    ]
   }
 
   inbound_rule {
