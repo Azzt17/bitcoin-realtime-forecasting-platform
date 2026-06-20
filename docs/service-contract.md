@@ -836,11 +836,21 @@ streaming inference
 prediction error evaluation
 ```
 
-Spark master endpoint:
+Spark master endpoint for the cloud deployment:
 
 ```text
-spark://spark-master:7077
+spark://<spark-master-private-ip>:7077
 ```
+
+Resolve `<spark-master-private-ip>` from Terraform rather than hardcoding it:
+
+```bash
+terraform -chdir=infra/terraform output -json node_private_ips \
+  | jq -r '."spark-master"'
+```
+
+The Spark RPC endpoint and web UI are private-VPC services. Do not add public
+firewall access for ports `7077`, `8080`, or `8081`.
 
 Expected job categories:
 
