@@ -639,6 +639,7 @@ Core tables:
 btc.raw_ohlcv
 btc.raw_blocks
 btc.raw_transactions
+btc.realtime_market_events
 btc.features_1h
 btc.features_4h
 btc.features_24h
@@ -647,6 +648,11 @@ btc.prediction_errors
 btc.model_metrics
 btc.pipeline_metrics
 ```
+
+`btc.realtime_market_events` is the realtime sink for valid
+`btc.market.raw` events. It is intentionally separate from historical tables
+and preserves Kafka topic, partition, and offset for traceability and logical
+deduplication.
 
 ---
 
