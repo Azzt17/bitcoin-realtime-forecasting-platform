@@ -5,10 +5,13 @@ datasources:
     type: grafana-clickhouse-datasource
     access: proxy
     uid: clickhouse
-    url: http://127.0.0.1:8123
     isDefault: true
     editable: false
     jsonData:
+      host: localhost
+      port: 8123
+      protocol: http
+      username: default
       defaultDatabase: btc
       defaultTable: realtime_market_events
       logs:
