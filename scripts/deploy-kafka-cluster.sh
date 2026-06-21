@@ -10,6 +10,7 @@ SERVICE_DIR="${PROJECT_DIR}/services/kafka"
 KAFKA_DATA_BASE="${PROJECT_DIR}/data/kafka"
 REMOTE_COMPOSE="${SERVICE_DIR}/docker-compose.yml"
 KAFKA_IMAGE="${KAFKA_IMAGE:-apache/kafka:3.7.0}"
+KAFKA_HEAP_OPTS="${KAFKA_HEAP_OPTS:--Xms512m -Xmx1g}"
 
 if [[ ! -d "${TF_DIR}" ]]; then
   echo "Terraform directory not found: ${TF_DIR}" >&2
@@ -92,6 +93,7 @@ services:
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: "0"
       KAFKA_LOG_DIRS: "/tmp/kraft-combined-logs"
+      KAFKA_HEAP_OPTS: "${KAFKA_HEAP_OPTS}"
     volumes:
       - ${node_data_dir}:/tmp/kraft-combined-logs
     networks:

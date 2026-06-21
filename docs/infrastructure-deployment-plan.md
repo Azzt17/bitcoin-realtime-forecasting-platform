@@ -242,7 +242,6 @@ spark_worker_private_ip
 analytics_private_ip
 analytics_public_ip
 grafana_url
-streamlit_url
 ssh_commands
 ```
 

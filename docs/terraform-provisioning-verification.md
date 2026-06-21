@@ -77,7 +77,6 @@ terraform output node_private_ips
 terraform output ssh_commands
 terraform output analytics_public_ip
 terraform output grafana_url
-terraform output streamlit_url
 ```
 
 ### SSH Verification

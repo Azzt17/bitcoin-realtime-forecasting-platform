@@ -1,0 +1,21 @@
+apiVersion: 1
+
+datasources:
+  - name: ClickHouse
+    type: grafana-clickhouse-datasource
+    access: proxy
+    uid: clickhouse
+    url: http://127.0.0.1:8123
+    isDefault: true
+    editable: false
+    jsonData:
+      defaultDatabase: btc
+      defaultTable: realtime_market_events
+      logs:
+        defaultDatabase: btc
+        defaultTable: realtime_market_events
+        defaultTimeColumn: event_time
+      traces:
+        defaultDatabase: btc
+        defaultTable: realtime_market_events
+        defaultDurationTimeColumn: event_time
