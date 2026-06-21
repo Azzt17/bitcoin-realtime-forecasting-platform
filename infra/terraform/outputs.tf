@@ -31,8 +31,3 @@ output "grafana_url" {
   description = "Temporary Grafana access URL."
   value       = "http://${digitalocean_droplet.nodes["analytics-node"].ipv4_address}:3000"
 }
-
-output "streamlit_url" {
-  description = "Temporary Streamlit access URL."
-  value       = "http://${digitalocean_droplet.nodes["analytics-node"].ipv4_address}:8501"
-}

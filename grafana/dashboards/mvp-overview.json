@@ -1,0 +1,92 @@
+{
+  "uid": "btc-mvp-overview",
+  "title": "Bitcoin MVP Overview",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "timezone": "browser",
+  "editable": true,
+  "tags": ["bitcoin", "mvp", "realtime"],
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Realtime Rows",
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT count() FROM btc.realtime_market_events FINAL",
+          "format": "table"
+        }
+      ],
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      }
+    },
+    {
+      "type": "table",
+      "title": "Latest Realtime Event",
+      "gridPos": { "h": 10, "w": 18, "x": 6, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT event_time, source, asset, close, kafka_topic, kafka_partition, kafka_offset FROM btc.realtime_market_events FINAL ORDER BY event_time DESC LIMIT 10",
+          "format": "table"
+        }
+      ],
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "OHLCV Raw Rows",
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT total_rows FROM system.tables WHERE database = 'btc' AND name = 'raw_ohlcv'",
+          "format": "table"
+        }
+      ],
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Block Rows",
+      "gridPos": { "h": 8, "w": 6, "x": 6, "y": 8 },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT total_rows FROM system.tables WHERE database = 'btc' AND name = 'raw_blocks'",
+          "format": "table"
+        }
+      ],
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Transaction Rows",
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 8 },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT total_rows FROM system.tables WHERE database = 'btc' AND name = 'raw_transactions'",
+          "format": "table"
+        }
+      ],
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      }
+    }
+  ]
+}
