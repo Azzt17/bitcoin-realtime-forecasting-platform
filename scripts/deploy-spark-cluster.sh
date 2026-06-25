@@ -96,6 +96,7 @@ services:
     restart: unless-stopped
     network_mode: host
     extra_hosts:
+      - spark-master:${master_private}
       - spark-worker-1:${worker_private}
     command:
       - /opt/spark/bin/spark-class
