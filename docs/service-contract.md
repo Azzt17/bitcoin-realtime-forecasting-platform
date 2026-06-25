@@ -660,13 +660,21 @@ deduplication.
 
 Feature tables are produced by Spark batch jobs.
 
+Current live hourly inputs in ClickHouse:
+
+```text
+btc.view_ohlcv_1h
+btc.view_blocks_1h
+btc.view_tx_1h
+```
+
 Example table:
 
 ```text
 btc.features_1h
 ```
 
-Expected fields:
+Current live fields:
 
 ```text
 feature_time
@@ -676,22 +684,11 @@ low
 close
 volume
 return_1h
-return_4h
-return_24h
-volatility_24h
-ma_24h
-volume_ma_24h
 block_count
-block_tx_count_sum
-block_fee_total_sum
-block_fee_total_usd_sum
 difficulty_avg
 tx_count
-tx_fee_sum
-tx_fee_avg
-tx_fee_median
-tx_cdd_total_sum
-target_return_1h
+fee_total_sum
+fee_avg
 created_at
 ```
 
@@ -861,13 +858,19 @@ firewall access for ports `7077`, `8080`, or `8081`.
 Expected job categories:
 
 ```text
-spark_batch/build_features_1h.py
-spark_batch/build_features_4h.py
-spark_batch/build_features_24h.py
+jobs/spark/build_features_1h.py
+jobs/spark/build_features_4h.py
+jobs/spark/build_features_24h.py
 spark_training/train_baseline.py
 spark_training/train_gbt.py
 spark_streaming/realtime_inference.py
 spark_evaluation/evaluate_predictions.py
+```
+
+The live Spark master currently runs copied job files from:
+
+```text
+/opt/spark/jobs/
 ```
 
 ---

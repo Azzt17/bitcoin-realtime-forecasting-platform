@@ -130,7 +130,7 @@ Database `btc` memiliki **3 tabel utama**:
 | Tabel | Deskripsi | Total Rows | Size |
 |-------|-----------|:----------:|:----:|
 | `raw_ohlcv` | Harga BTC per menit (OHLCV) | 7,607,549 | 174.93 MiB |
-| `raw_blocks` | Data block Bitcoin | 265,785 | ~102 MiB |
+| `raw_blocks` | Data block Bitcoin | 265,912 | ~102 MiB |
 | `raw_transactions` | Data transaksi Bitcoin | 728,801,169 | 75.16 GiB |
 
 ---
@@ -197,9 +197,9 @@ ORDER BY year;
 > **Deskripsi:** Data setiap block Bitcoin yang berhasil ditambang, dari tahun 2021 hingga 2026.
 
 ```
-Total Rows  : 265,785
+Total Rows  : 265,912
 Data Size   : ~102 MiB
-Date Range  : 2021-06-11  →  2026-05-11
+Date Range  : 2021-06-11 00:01:28  →  2026-06-11 23:50:09
 ```
 
 #### Schema
@@ -429,7 +429,7 @@ SELECT 'raw_transactions',         MIN(tx_time),    MAX(tx_time)   FROM btc.raw_
 | Tabel | Total Rows | Data Size | Date Range | Status |
 |-------|:----------:|:---------:|-----------|:------:|
 | `raw_ohlcv` | 7,607,549 | 174.93 MiB | 2012-01-01 → 2026-06-19 | ✅ OK |
-| `raw_blocks` | 265,785 | ~102 MiB | 2021-06-11 → 2026-05-11 | ✅ OK |
+| `raw_blocks` | 265,912 | ~102 MiB | 2021-06-11 → 2026-06-11 | ✅ OK |
 | `raw_transactions` | 728,801,169 | 75.16 GiB | 2021-05-31 → 2026-06-11 | ✅ OK |
 
 ---
@@ -449,9 +449,9 @@ SELECT 'raw_transactions',         MIN(tx_time),    MAX(tx_time)   FROM btc.raw_
 
 | Metrik | Nilai |
 |--------|------:|
-| Total Block | **265,785** |
-| Rata-rata Block/Hari | **~148** |
-| Rata-rata Tx/Block | **2,728** |
+| Total Block | **265,912** |
+| Rata-rata Block/Hari | **~146** |
+| Rata-rata Tx/Block | **2,741** |
 | Top Miner | **Foundry USA Pool** *(65,101 blocks)* |
 
 #### 💸 Transactions
