@@ -233,7 +233,7 @@ Recommended ClickHouse schema:
 ```sql
 CREATE TABLE IF NOT EXISTS btc.raw_ohlcv
 (
-    event_time DateTime64(3, 'UTC'),
+    timestamp DateTime64(3, 'UTC'),
     open Float64,
     high Float64,
     low Float64,
@@ -243,13 +243,13 @@ CREATE TABLE IF NOT EXISTS btc.raw_ohlcv
     ingested_at DateTime64(3, 'UTC') DEFAULT now64(3)
 )
 ENGINE = MergeTree()
-ORDER BY event_time;
+ORDER BY timestamp;
 ```
 
 Data quality requirements:
 
 ```text
-No duplicate event_time
+No duplicate timestamp
 No null OHLC values
 high >= low
 high >= open
@@ -267,7 +267,7 @@ timestamp must be sorted or sortable
 Expected fields may include:
 
 ```text
-height
+id
 hash
 time
 transaction_count
@@ -301,10 +301,24 @@ Recommended ClickHouse schema:
 ```sql
 CREATE TABLE IF NOT EXISTS btc.raw_blocks
 (
-    height UInt64,
+    id UInt64,
     hash String,
-    event_time DateTime64(3, 'UTC'),
+    time DateTime64(3, 'UTC'),
+    median_time DateTime64(3, 'UTC'),
+    size UInt64,
+    stripped_size UInt64,
+    weight UInt64,
+    version UInt32,
+    version_hex String,
+    version_bits String,
+    merkle_root String,
+    nonce UInt32,
+    bits String,
+    difficulty Float64,
+    chainwork String,
+    coinbase_data_hex String,
     transaction_count UInt32,
+    witness_count UInt32,
     input_count UInt32,
     output_count UInt32,
     input_total Float64,
@@ -313,27 +327,28 @@ CREATE TABLE IF NOT EXISTS btc.raw_blocks
     output_total_usd Float64,
     fee_total Float64,
     fee_total_usd Float64,
+    fee_per_kb Float64,
+    fee_per_kb_usd Float64,
+    fee_per_kwu Float64,
+    fee_per_kwu_usd Float64,
     cdd_total Float64,
     generation Float64,
     generation_usd Float64,
     reward Float64,
     reward_usd Float64,
-    difficulty Float64,
-    size UInt64,
-    weight UInt64,
     guessed_miner String,
     ingested_at DateTime64(3, 'UTC') DEFAULT now64(3)
 )
 ENGINE = MergeTree()
-ORDER BY (event_time, height);
+ORDER BY (time, id);
 ```
 
 Data quality requirements:
 
 ```text
-height should be unique
+id should be unique
 hash should be unique
-event_time must be valid UTC
+time must be valid UTC
 numeric values must be non-negative where applicable
 difficulty must be positive
 ```
@@ -346,8 +361,8 @@ Expected fields may include:
 
 ```text
 block_id
-hash
-time
+tx_hash
+tx_time
 size
 weight
 version
@@ -385,33 +400,14 @@ Spark must aggregate transaction data into time-window features first.
 Recommended aggregate tables:
 
 ```text
-btc.tx_features_1h
-btc.tx_features_4h
-btc.tx_features_24h
+btc.features_1h
 ```
 
-Example aggregate fields:
+MVP rule:
 
 ```text
-bucket_time
-tx_count
-fee_sum
-fee_avg
-fee_median
-fee_per_kb_avg
-input_total_sum
-output_total_sum
-input_total_usd_sum
-output_total_usd_sum
-tx_size_avg
-tx_weight_avg
-input_count_avg
-output_count_avg
-coinbase_tx_count
-witness_tx_ratio
-cdd_total_sum
-large_tx_count
-large_tx_value_usd_sum
+Raw transaction rows are never model inputs directly.
+Spark must aggregate transaction data into the 1h feature table.
 ```
 
 ---
@@ -489,60 +485,33 @@ volume
 Purpose:
 
 ```text
-Live Blockchair on-chain stats or replayed on-chain events.
+Live Blockchair raw block/transaction envelope used by the MVP on-chain stream.
 ```
 
 Required message format:
 
 ```json
 {
-  "event_time": "2026-06-19T13:00:00Z",
-  "ingested_at": "2026-06-19T13:00:02Z",
-  "source": "blockchair",
-  "asset": "BTC",
-  "market_price_usd": 62885.0,
-  "transactions_24h": 762752,
-  "volume_24h_btc": 727991.26046252,
-  "mempool_transactions": 114075,
-  "mempool_size_mb": 94.979198,
-  "mempool_tps": 3.3667,
-  "avg_fee_usd_24h": 0.2696,
-  "median_fee_usd_24h": 0.088,
-  "suggested_fee_sat_per_byte": 2,
-  "blocks_24h": 153,
-  "difficulty": 124932866006548.2,
-  "hashrate_24h_eh": 951.3875,
-  "hodling_addresses": 59214523,
-  "request_cost": 1
+  "event_type": "block",
+  "ingested_at": 1718809202,
+  "data": "{\"id\":1234567,\"time\":\"2026-06-19 13:00:00\", ... }"
 }
 ```
 
 Required fields:
 
 ```text
-event_time
+event_type
 ingested_at
-source
-asset
-request_cost
+data
 ```
 
 Recommended fields:
 
 ```text
-market_price_usd
-transactions_24h
-volume_24h_btc
-mempool_transactions
-mempool_size_mb
-mempool_tps
-avg_fee_usd_24h
-median_fee_usd_24h
-suggested_fee_sat_per_byte
-blocks_24h
-difficulty
-hashrate_24h_eh
-hodling_addresses
+data should be stringified JSON from Blockchair
+event_type should be either block or transaction
+ingested_at should be UNIX epoch seconds
 ```
 
 ---
@@ -565,12 +534,12 @@ Example message:
   "horizon": "1h",
   "close": 62885.0,
   "return_1h": 0.0021,
-  "volatility_24h": 0.041,
-  "ma_24h": 62100.5,
-  "volume_ma_24h": 99.2,
-  "transactions_24h": 762752,
-  "mempool_transactions": 114075,
-  "avg_fee_usd_24h": 0.2696
+  "volatility_6h": 0.019,
+  "ma_7": 62410.5,
+  "block_count": 6,
+  "tx_count": 792811,
+  "fee_total_sum": 43.18,
+  "difficulty_avg": 8.21e13
 }
 ```
 
@@ -641,8 +610,7 @@ btc.raw_blocks
 btc.raw_transactions
 btc.realtime_market_events
 btc.features_1h
-btc.features_4h
-btc.features_24h
+btc.training_dataset_1h
 btc.predictions
 btc.prediction_errors
 btc.model_metrics
@@ -668,7 +636,7 @@ btc.view_blocks_1h
 btc.view_tx_1h
 ```
 
-Example table:
+Current live feature bootstrap table:
 
 ```text
 btc.features_1h
@@ -692,21 +660,215 @@ fee_avg
 created_at
 ```
 
+Live state note:
+
+```text
+`btc.features_1h` exists but is currently empty in ClickHouse.
+The table is the bootstrap sink for the MVP 1h pipeline.
+```
+
+Canonical MVP 1h schema:
+
+These are lookback features inside one 1h table, not separate 4h/24h tables.
+
+```text
+feature_time
+open
+high
+low
+close
+volume
+return_1h
+return_4h
+return_24h
+volatility_6h
+volatility_24h
+ma_7
+ma_14
+ma_30
+volume_ma_24h
+volume_change
+high_low_spread
+close_open_spread
+rsi_14
+macd
+bollinger_upper
+bollinger_lower
+atr_14
+hour_of_day
+day_of_week
+is_weekend
+block_count
+transaction_count_sum
+fee_total_sum
+fee_total_usd_sum
+difficulty_avg
+reward_sum
+reward_usd_sum
+size_avg
+weight_avg
+tx_count
+fee_sum
+fee_avg
+fee_median
+fee_per_kb_avg
+input_total_sum
+output_total_sum
+output_total_usd_sum
+tx_size_avg
+tx_weight_avg
+input_count_avg
+output_count_avg
+witness_ratio
+large_tx_count
+large_tx_value_sum
+cdd_total_sum
+fee_per_volume
+tx_per_volume
+cdd_per_price
+fee_pressure_index
+network_activity_change
+created_at
+```
+
+Feature definitions:
+
+```text
+large_tx_count / large_tx_value_sum use a fixed threshold of output_total >= 1_000_000_000 satoshi (10 BTC)
+witness_ratio is the share of tx rows where has_witness = 1
+fee_pressure_index = fee_total_sum / block_count
+network_activity_change = pct change in tx_count versus 24h prior
+cdd_per_price = cdd_total_sum / close
+fee_per_volume = fee_total_sum / volume
+tx_per_volume = tx_count / volume
+```
+
 Important rule:
 
 ```text
 Feature tables must not include future information in feature columns.
-Only target columns may refer to future values.
+Only downstream training tables may add target columns such as target_return_1h.
 ```
 
 ---
 
-## 7.2 Prediction Table
+## 7.2 Backfill Control and Resume Contract
+
+Historical feature generation runs in monthly batches so a stopped job can be
+resumed without losing completed work.
+
+Checkpoint table:
+
+```text
+btc.feature_backfill_batches
+```
+
+Recommended row contract:
+
+```text
+batch_id
+feature_grain
+batch_start
+batch_end
+warmup_start
+target_table
+source_hours
+processed_hours
+estimated_minutes
+status
+attempt_count
+batch_owner
+last_error
+started_at
+finished_at
+updated_at
+```
+
+Batch rules:
+
+```text
+Batch grain: 1 month
+Warmup window: 96 hours
+Batch window: [start, end) with end exclusive
+Effective backfill window starts at the latest overlapping source month.
+Status lifecycle: pending -> running -> succeeded/failed -> resumed if needed
+Resume rule: succeeded batches are skipped on the next run
+```
+
+Operator workflow:
+
+```text
+1. Plan batches from the live hourly range.
+2. Insert checkpoint rows for each month.
+3. Run one batch at a time with `scripts/run-feature-backfill.sh`.
+4. Re-run the reporter to inspect status and remaining batches.
+5. Retry only failed or interrupted batches.
+```
+
+---
+
+## 7.3 Training Dataset
+
+Training data is derived from `btc.features_1h` by joining the future return
+target after the feature timestamp.
+
+Prepared job:
+
+```text
+spark_training/build_training_dataset_1h.py
+```
+
+Recommended table:
+
+```text
+btc.training_dataset_1h
+```
+
+Recommended columns:
+
+```text
+feature_time
+<all btc.features_1h columns except created_at>
+target_return_1h
+created_at
+```
+
+Current contract note:
+
+```text
+The training dataset is generated from the feature table plus the next-hour
+OHLCV close. The target is target_return_1h = (close[t+1] - close[t]) / close[t].
+```
+
+Recommended split rule:
+
+```text
+time-based split only
+```
+
+Example split:
+
+```text
+Train      : 2021–2024
+Validation : 2025
+Test       : 2026
+```
+
+---
+
+## 7.4 Prediction Table
 
 Table:
 
 ```text
 btc.predictions
+```
+
+Current implementation note:
+
+```text
+The prediction rows are re-runnable and stored with a deterministic
+prediction_id so repeated launches can replace the same logical window.
 ```
 
 Recommended schema:
@@ -726,8 +888,8 @@ CREATE TABLE IF NOT EXISTS btc.predictions
     predicted_price Float64,
     created_at DateTime64(3, 'UTC') DEFAULT now64(3)
 )
-ENGINE = MergeTree()
-ORDER BY (horizon, model_name, prediction_time);
+ENGINE = ReplacingMergeTree(created_at)
+ORDER BY (horizon, model_name, prediction_time, target_time, prediction_id);
 ```
 
 ---
@@ -738,6 +900,13 @@ Table:
 
 ```text
 btc.prediction_errors
+```
+
+Current implementation note:
+
+```text
+Error rows are written after the target time has arrived and use the same
+prediction identity as the source row.
 ```
 
 Recommended schema:
@@ -762,8 +931,8 @@ CREATE TABLE IF NOT EXISTS btc.prediction_errors
     direction_correct UInt8,
     evaluated_at DateTime64(3, 'UTC') DEFAULT now64(3)
 )
-ENGINE = MergeTree()
-ORDER BY (horizon, model_name, target_time);
+ENGINE = ReplacingMergeTree(evaluated_at)
+ORDER BY (horizon, model_name, target_time, prediction_time, prediction_id);
 ```
 
 ---
@@ -774,6 +943,12 @@ Table:
 
 ```text
 btc.model_metrics
+```
+
+Current implementation note:
+
+```text
+The MVP jobs write one summary row per model/version/horizon evaluation window.
 ```
 
 Recommended fields:
@@ -823,7 +998,14 @@ spark_processed_rows_per_sec
 spark_batch_duration_ms
 clickhouse_insert_latency_ms
 prediction_latency_ms
+modeling_1h_dataset_build_started
+modeling_1h_gbt_train_elapsed_seconds
+modeling_1h_gbt_train_finished
 ```
+
+The 1h modeling wrapper writes stage-level rows into this table so Grafana can
+show live progress while the dataset build, baseline training, and GBT training
+are running.
 
 ---
 
@@ -833,6 +1015,7 @@ Spark is used for:
 
 ```text
 batch feature engineering
+training dataset construction
 model training
 batch inference
 streaming inference
@@ -859,12 +1042,18 @@ Expected job categories:
 
 ```text
 jobs/spark/build_features_1h.py
-jobs/spark/build_features_4h.py
-jobs/spark/build_features_24h.py
+spark_training/build_training_dataset_1h.py
 spark_training/train_baseline.py
 spark_training/train_gbt.py
 spark_streaming/realtime_inference.py
 spark_evaluation/evaluate_predictions.py
+```
+
+Operational launch scripts:
+
+```text
+scripts/watch-feature-backfill-and-run-modeling.sh
+scripts/run-modeling-1h.sh
 ```
 
 The live Spark master currently runs copied job files from:
@@ -883,6 +1072,9 @@ Model artifacts should be stored in:
 models/
 ```
 
+Prepared jobs currently default to a local container path under
+`/tmp/bitcoin-models/` until a persistent model volume is mounted.
+
 Recommended structure:
 
 ```text
@@ -890,9 +1082,7 @@ models/
 ├── baseline/
 │   └── persistence_1h/
 ├── spark_gbt/
-│   ├── btc_return_1h_v1/
-│   ├── btc_return_4h_v1/
-│   └── btc_return_24h_v1/
+│   └── btc_return_1h_v1/
 └── metadata/
     └── model_registry.json
 ```
@@ -913,10 +1103,14 @@ Each model must have metadata:
     "close",
     "volume",
     "return_1h",
-    "volatility_24h",
-    "ma_24h",
-    "block_tx_count_sum",
-    "tx_fee_avg"
+    "return_4h",
+    "return_24h",
+    "block_count",
+    "tx_count",
+    "fee_total_sum",
+    "difficulty_avg",
+    "hour_of_day",
+    "day_of_week"
   ],
   "metrics": {
     "rmse_return": 0.0,
@@ -1010,12 +1204,34 @@ Recommended execution order:
 2. Infrastructure team creates Kafka topics and ClickHouse database.
 3. Ingestion team imports historical OHLCV, blocks, and transaction aggregates.
 4. Modeling team builds Spark feature tables.
-5. Modeling team trains 1h baseline and Spark GBT model.
-6. Infrastructure team exposes Grafana/Streamlit.
-7. Ingestion team builds realtime/replay producer.
-8. Modeling team builds Spark streaming inference.
-9. Prediction results are written to ClickHouse.
-10. Dashboard displays actual vs predicted and error.
+5. Modeling team builds the 1h training dataset.
+6. Modeling team trains the 1h baseline and Spark GBT model.
+7. Modeling team writes batch predictions to ClickHouse.
+8. Modeling team evaluates delayed prediction errors.
+9. Infrastructure team exposes Grafana/Streamlit.
+10. Ingestion team builds realtime/replay producer.
+11. Modeling team builds Spark streaming inference.
+12. Prediction results are written to ClickHouse.
+13. Dashboard displays actual vs predicted and error.
+```
+
+Operational shortcut:
+
+```text
+When the 1h feature backfill is still running, use
+scripts/watch-feature-backfill-and-run-modeling.sh to poll progress and
+launch the modeling pipeline automatically once the checkpoint table reaches
+the finished state.
+```
+
+Split policy:
+
+```text
+The modeling launcher derives train/score windows from btc.features_1h
+coverage at runtime. It keeps the newest year as the default score window when
+coverage is long enough, and falls back to an 80/20 time split when coverage
+is shorter. The end boundary is exclusive, so the latest available hour can be
+used safely without adding an artificial extra gap.
 ```
 
 ---
@@ -1032,17 +1248,20 @@ Historical OHLCV imported
 Historical block data imported
 Transaction aggregate features generated
 btc.features_1h table created
+btc.training_dataset_1h table created
 1h baseline model
 1h Spark GBT model
 btc.predictions table
 btc.prediction_errors table
+btc.model_metrics table
+btc.pipeline_metrics table
 basic Grafana or Streamlit dashboard
 ```
 
 MVP does not require:
 
 ```text
-all 3 horizons complete
+4h and 24h feature tables
 LSTM/GRU
 XGBoost
 full cloud hardening
@@ -1060,7 +1279,7 @@ The team must still decide:
 Which live market price API will be used?
 Will historical data be imported directly to ClickHouse or stored as Parquet first?
 Will raw transaction data be stored fully or only as aggregates?
-What is the first official model horizon: 1h only or 1h + 4h?
+Which future horizons, if any, are added after the 1h MVP?
 Will LSTM be included in final scope or optional appendix?
 Will cloud deployment be required for final submission?
 ```

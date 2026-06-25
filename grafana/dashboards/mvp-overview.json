@@ -1,12 +1,12 @@
 {
   "uid": "btc-mvp-overview",
-  "title": "Bitcoin MVP Overview",
+  "title": "Bitcoin MVP Overview and Backfill",
   "schemaVersion": 39,
-  "version": 1,
+  "version": 2,
   "refresh": "10s",
   "timezone": "browser",
   "editable": true,
-  "tags": ["bitcoin", "mvp", "realtime"],
+  "tags": ["bitcoin", "mvp", "realtime", "backfill"],
   "panels": [
     {
       "type": "stat",
@@ -80,6 +80,198 @@
         {
           "refId": "A",
           "rawSql": "SELECT total_rows FROM system.tables WHERE database = 'btc' AND name = 'raw_transactions'",
+          "format": "table"
+        }
+      ],
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Backfill Completed",
+      "gridPos": { "h": 8, "w": 4, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT countIf(status IN ('succeeded', 'complete')) FROM btc.feature_backfill_batches FINAL",
+          "format": "table"
+        }
+      ],
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Backfill Running",
+      "gridPos": { "h": 8, "w": 4, "x": 4, "y": 16 },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT countIf(status = 'running') FROM btc.feature_backfill_batches FINAL",
+          "format": "table"
+        }
+      ],
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Backfill Pending",
+      "gridPos": { "h": 8, "w": 4, "x": 8, "y": 16 },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT countIf(status = 'pending') FROM btc.feature_backfill_batches FINAL",
+          "format": "table"
+        }
+      ],
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Backfill Failed",
+      "gridPos": { "h": 8, "w": 4, "x": 12, "y": 16 },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT countIf(status = 'failed') FROM btc.feature_backfill_batches FINAL",
+          "format": "table"
+        }
+      ],
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Backfill Progress %",
+      "gridPos": { "h": 8, "w": 4, "x": 16, "y": 16 },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT if(count() = 0, 0, round(100.0 * countIf(status IN ('succeeded', 'complete')) / count(), 1)) FROM btc.feature_backfill_batches FINAL",
+          "format": "table"
+        }
+      ],
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Backfill ETA Remaining (min)",
+      "gridPos": { "h": 8, "w": 4, "x": 20, "y": 16 },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT if(count() = 0, 0, round(sumIf(estimated_minutes, status IN ('pending', 'running', 'failed')), 0)) FROM btc.feature_backfill_batches FINAL",
+          "format": "table"
+        }
+      ],
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      }
+    },
+    {
+      "type": "table",
+      "title": "Recent Backfill Batches",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 24 },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT batch_id, status, source_hours, processed_hours, estimated_minutes, attempt_count, batch_owner, started_at, finished_at, updated_at, last_error FROM btc.feature_backfill_batches FINAL ORDER BY updated_at DESC LIMIT 12",
+          "format": "table"
+        }
+      ],
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Predictions Rows",
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 34 },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT count() FROM btc.predictions",
+          "format": "table"
+        }
+      ],
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Predictions Staging Rows",
+      "gridPos": { "h": 8, "w": 6, "x": 6, "y": 34 },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT count() FROM btc.predictions_staging",
+          "format": "table"
+        }
+      ],
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Model Metrics Rows",
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 34 },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT count() FROM btc.model_metrics",
+          "format": "table"
+        }
+      ],
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Pipeline Metrics Rows",
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 34 },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT count() FROM btc.pipeline_metrics",
+          "format": "table"
+        }
+      ],
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      }
+    },
+    {
+      "type": "table",
+      "title": "Recent Modeling Events",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 42 },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT metric_time, component, metric_name, metric_value, unit, tags, created_at FROM btc.pipeline_metrics WHERE component = 'modeling_1h' ORDER BY metric_time DESC LIMIT 20",
           "format": "table"
         }
       ],
