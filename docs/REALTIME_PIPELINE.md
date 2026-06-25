@@ -16,6 +16,7 @@ Pipeline realtime MVP saat ini terdiri dari empat bagian:
 File:
 
 - `scripts/stream_blockchair_to_kafka.py`
+- `scripts/bootstrap-node-runtime.sh`
 
 Fungsi:
 
@@ -32,9 +33,12 @@ Konfigurasi runtime:
 Catatan operasional:
 
 - Jangan hard-code API key di source.
+- Script sekarang mengirim key ke Blockchair sebagai query parameter `?key=...`
+  sesuai format yang diminta.
 - Gunakan interval polling yang konservatif.
 - Jika Kafka tidak tersedia, proses harus fail fast atau dijalankan dalam `--dry-run` untuk validasi API saja.
 - Jika Blockchair membalas 430, poller akan menyimpan `next_allowed_at` di state file dan menahan retry sampai cooldown lewat.
+- Node runtime bootstrap memasang `kafka-python` karena producer memerlukannya.
 
 ## 2. Kafka on-chain stream → ClickHouse
 
@@ -42,6 +46,8 @@ File:
 
 - `spark_streaming/onchain_to_clickhouse.py`
 - `clickhouse/schema/realtime_onchain_events.sql`
+- `scripts/deploy-onchain-stream-pipeline.sh`
+- `scripts/verify-onchain-stream-pipeline.sh`
 
 Fungsi:
 
@@ -128,6 +134,13 @@ python3 scripts/stream_blockchair_to_kafka.py
   --kafka-bootstrap kafka-1:9092,kafka-2:9092,kafka-3:9092 \
   --clickhouse-url http://ANALYTICS_NODE_IP:8123/ \
   --checkpoint /tmp/spark-checkpoint-onchain
+```
+
+Atau gunakan wrapper:
+
+```bash
+bash scripts/deploy-onchain-stream-pipeline.sh
+bash scripts/verify-onchain-stream-pipeline.sh
 ```
 
 4. Jalankan realtime feature loop:

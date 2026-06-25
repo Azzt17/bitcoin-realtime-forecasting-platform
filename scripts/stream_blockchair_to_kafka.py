@@ -15,8 +15,6 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-from kafka import KafkaProducer
-
 DEFAULT_API_BASE = os.environ.get("BLOCKCHAIR_API_BASE", "https://api.blockchair.com/bitcoin")
 DEFAULT_TOPIC = os.environ.get("KAFKA_TOPIC", "btc.onchain.raw")
 DEFAULT_STATE_FILE = os.environ.get(
@@ -64,6 +62,11 @@ def parse_args() -> argparse.Namespace:
         "--dry-run",
         action="store_true",
         help="Fetch Blockchair data and print progress without sending anything to Kafka.",
+    )
+    parser.add_argument(
+        "--once",
+        action="store_true",
+        help="Run a single blocks + transactions cycle and exit.",
     )
     return parser.parse_args()
 
@@ -131,14 +134,14 @@ def get_blockchair_data(
     timeout_seconds: int = 30,
 ) -> dict[str, Any]:
     params = dict(params or {})
+    if api_key:
+        params["key"] = api_key
     query_string = urllib.parse.urlencode(params)
     url = f"{api_base.rstrip('/')}/{endpoint}"
     if query_string:
         url = f"{url}?{query_string}"
 
     headers = {"User-Agent": "bitcoin-realtime-forecasting-platform/1.0"}
-    if api_key:
-        headers["X-Auth-Token"] = api_key
 
     request = urllib.request.Request(url, headers=headers)
     try:
@@ -154,7 +157,14 @@ def get_blockchair_data(
         raise RuntimeError(f"Failed to fetch Blockchair endpoint {endpoint}: {exc}") from exc
 
 
-def connect_kafka(kafka_bootstrap: str) -> KafkaProducer:
+def connect_kafka(kafka_bootstrap: str):
+    try:
+        from kafka import KafkaProducer
+    except ImportError as exc:
+        raise RuntimeError(
+            "kafka-python is not installed on this host. Run in --dry-run mode or install kafka-python."
+        ) from exc
+
     if not kafka_bootstrap:
         raise SystemExit(
             "Kafka bootstrap servers are required. Set --kafka-bootstrap or KAFKA_BOOTSTRAP_SERVERS."
@@ -168,7 +178,7 @@ def connect_kafka(kafka_bootstrap: str) -> KafkaProducer:
     )
 
 
-def publish_event(producer: KafkaProducer | None, topic: str, event: dict[str, Any]) -> None:
+def publish_event(producer, topic: str, event: dict[str, Any]) -> None:
     if producer is None:
         print(f"[DRY-RUN] {event['event_type']} id={event['data_id']} time={event['event_time']}")
         return
@@ -176,7 +186,7 @@ def publish_event(producer: KafkaProducer | None, topic: str, event: dict[str, A
 
 
 def ingest_endpoint(
-    producer: KafkaProducer | None,
+    producer: Any | None,
     topic: str,
     api_base: str,
     api_key: str,
@@ -226,7 +236,7 @@ def main() -> int:
     last_tx_id = int(state["last_tx_id"])
     next_allowed_at = int(state.get("next_allowed_at", 0))
 
-    producer: KafkaProducer | None = None
+    producer: Any | None = None
     if not args.dry_run:
         producer = connect_kafka(args.kafka_bootstrap)
         print("[init] Kafka producer connected")
@@ -307,7 +317,15 @@ def main() -> int:
             time.sleep(args.backoff_seconds)
             continue
 
+        if args.once:
+            break
+
         time.sleep(args.poll_interval_seconds)
+
+    if producer is not None:
+        producer.flush()
+
+    return 0
 
 
 if __name__ == "__main__":
